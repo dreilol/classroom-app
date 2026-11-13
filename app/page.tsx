@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import AppHeader from '@/app/components/AppHeader'
 
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null)
@@ -18,8 +19,9 @@ export default function Dashboard() {
   if (!user) return <div className="p-8">Loading...</div>
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <div className="max-w-2xl mx-auto">
+    <div className="min-h-screen bg-gray-100">
+      <AppHeader />
+      <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800">Classroom Dashboard</h1>
           <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="text-red-500 font-semibold">Logout</button>

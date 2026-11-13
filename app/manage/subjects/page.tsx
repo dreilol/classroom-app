@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
+import AppHeader from '@/app/components/AppHeader'
 
 export default function ManageSubjects() {
   const [subjects, setSubjects] = useState<any[]>([])
@@ -30,8 +31,9 @@ export default function ManageSubjects() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <div className="max-w-md mx-auto bg-white p-6 rounded-lg shadow">
+    <div className="min-h-screen bg-gray-100">
+      <AppHeader />
+      <div className="max-w-3xl mx-auto mt-8 px-4 pb-8">
         <Link href="/" className="text-blue-500 text-sm mb-4 block">← Back to Dashboard</Link>
         <h1 className="text-2xl font-bold mb-4 text-gray-800">Subjects</h1>
         

@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
+import AppHeader from '@/app/components/AppHeader'
 
 export default function ManageStudents() {
   const [students, setStudents] = useState<any[]>([])
@@ -60,8 +61,9 @@ export default function ManageStudents() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 md:p-8">
-      <div className="max-w-3xl mx-auto bg-white p-6 rounded-lg shadow">
+    <div className="min-h-screen bg-gray-100">
+      <AppHeader />
+      <div className="max-w-5xl mx-auto mt-8 px-4 pb-8">
         <Link href="/" className="text-blue-500 text-sm mb-4 block">← Back to Dashboard</Link>
         
         <div className="flex justify-between items-center mb-6">
