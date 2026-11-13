@@ -1,171 +1,29 @@
-'use client'
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
-import Link from 'next/link'
-import AppHeader from '@/app/components/AppHeader'
+"use client";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import Link from "next/link";
+import AppHeader from "@/app/components/AppHeader";
 
 export default function Recitation() {
-  const [subjects, setSubjects] = useState<any[]>([])
-  const [selectedSubject, setSelectedSubject] = useState('')
-  const [students, setStudents] = useState<any[]>([])
-  const [tallies, setTallies] = useState<Record<string, number>>({})
-  const [notes, setNotes] = useState('')
-  const [date, setDate] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [loading, setLoading] = useState(true)
-
-  // 1. Fetch Subjects & Set Today's Date
-  useEffect(() => {
-    setDate(new Date().toISOString().split('T')[0])
-    supabase.from('subjects').select('*').eq('archived', false).then(({ data }) => {
-      if (data && data.length > 0) {
-        setSubjects(data)
-        setSelectedSubject(data[0].id)
-      }
-    })
-  }, [])
-
-  // 2. Fetch Students, Tallies, and Notes
-  useEffect(() => {
-    if (!selectedSubject || !date) return
-    setLoading(true)
-    
-    const fetchData = async () => {
-      // Get students
-      const { data: stds } = await supabase.from('students').select('*').eq('archived', false).order('seat_row').order('seat_col')
-      if (stds) setStudents(stds)
-
-      // Get existing tallies
-      const { data: recs } = await supabase.from('recitation').select('*').eq('subject_id', selectedSubject).eq('date', date)
-      const newTallies: Record<string, number> = {}
-      stds?.forEach(s => newTallies[s.id] = 0) // default to 0
-      recs?.forEach(r => newTallies[r.student_id] = r.times_called)
-      setTallies(newTallies)
-
-      // Get notes
-      const { data: notesData } = await supabase.from('daily_notes').select('*').eq('subject_id', selectedSubject).eq('date', date).maybeSingle()
-      setNotes(notesData?.notes || '')
-      
-      setLoading(false)
-    }
-    fetchData()
-  }, [selectedSubject, date])
-
-  // 3. Handle Tapping
-  const addTally = (studentId: string) => {
-    setTallies(prev => ({ ...prev, [studentId]: (prev[studentId] || 0) + 1 }))
-  }
-
-  // Long press (right-click on PC) to subtract
-  const subtractTally = (e: React.MouseEvent, studentId: string) => {
-    e.preventDefault() // Prevent normal click
-    if ((tallies[studentId] || 0) > 0) {
-      setTallies(prev => ({ ...prev, [studentId]: prev[studentId] - 1 }))
-    }
-  }
-
-  // 4. Save to Database
-  const saveRecitation = async () => {
-    setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    // Save tallies
-    const records = students
-      .filter(s => tallies[s.id] > 0) // Only save students with more than 0
-      .map(s => ({
-        user_id: user?.id,
-        date,
-        subject_id: selectedSubject,
-        student_id: s.id,
-        times_called: tallies[s.id]
-      }))
-
-    // Delete existing records for this day to prevent duplicates when re-saving
-    await supabase.from('recitation').delete().match({ user_id: user?.id, date, subject_id: selectedSubject })
-
-    if (records.length > 0) {
-      const { error } = await supabase.from('recitation').insert(records)
-      if (error) alert("Error saving recitation: " + error.message)
-    }
-
-    // Save notes
-    await supabase.from('daily_notes').upsert({ 
-      user_id: user?.id, 
-      date, 
-      subject_id: selectedSubject, 
-      notes 
-    }, { onConflict: 'user_id,date,subject_id' })
-    
-    setSaving(false)
-    alert("Recitation saved successfully!")
-  }
-
-  const maxRow = Math.max(...students.map(s => s.seat_row), 0)
-  const maxCol = Math.max(...students.map(s => s.seat_col), 0)
-
-  return (
-    <div className="min-h-screen bg-gray-100">
-      <AppHeader />
-      <div className="max-w-5xl mx-auto mt-8 px-4 pb-8">
-        <Link href="/" className="text-blue-500 text-sm mb-4 block">← Back to Dashboard</Link>
-        
-        <section className="mb-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5"><div className="mb-4"><h1 className="text-2xl font-bold tracking-tight text-gray-800">Recitation log</h1><p className="mt-1 text-sm text-gray-500">Tap a student to add a tally. Use right-click or long-press to subtract.</p></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_190px_auto]">
-          <select value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)} className="p-2 border rounded text-black font-semibold">
-            {subjects.length === 0 && <option value="">No subjects found</option>}
-            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)} className="p-2 border rounded text-black" />
-          <button onClick={saveRecitation} disabled={saving || loading} className="bg-blue-600 text-white px-6 py-2 rounded font-bold hover:bg-blue-700 disabled:bg-gray-400">
-            {saving ? 'Saving...' : 'Save Recitation'}
-          </button>
-        </div></section>
-
-        <p className="mb-4 text-sm text-gray-500">Participation counts are saved for the selected subject and date.</p>
-
-        {/* The Seating Chart */}
-        {loading ? <p>Loading...</p> : (
-          <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5"><div className="mb-4 flex items-center justify-between"><h2 className="font-bold text-gray-800">Seating chart</h2><span className="text-xs text-gray-500">{students.length} students</span></div><div className="overflow-x-auto pb-4">
-            <div 
-              className="grid gap-2" 
-              style={{ gridTemplateColumns: `repeat(${maxCol || 1}, minmax(100px, 1fr))` }}
-            >
-              {students.map(student => {
-                const count = tallies[student.id] || 0
-                const bgColor = count > 0 ? 'bg-blue-500' : 'bg-gray-200'
-                const textColor = count > 0 ? 'text-white' : 'text-gray-500'
-                return (
-                  <div 
-                    key={student.id}
-                    onClick={() => addTally(student.id)}
-                    onContextMenu={(e) => subtractTally(e, student.id)}
-                    className={`${bgColor} ${textColor} p-2 rounded cursor-pointer text-xs font-bold text-center flex flex-col items-center justify-center min-h-[60px] shadow-sm select-none hover:opacity-80 transition relative`}
-                    style={{ gridRow: student.seat_row, gridColumn: student.seat_col }}
-                  >
-                    <span>{student.name}</span>
-                    {count > 0 && (
-                      <span className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs border-2 border-white">
-                        {count}
-                      </span>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}</section>
-
-        {/* Class Notes */}
-        <section className="mt-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Class Notes (Optional)</label>
-          <textarea 
-            value={notes} 
-            onChange={e => setNotes(e.target.value)} 
-            placeholder="e.g., All students will receive a 10/10 for their recitation today."
-            className="w-full p-3 border rounded text-black h-24 resize-none"
-          />
-        </section>
-
-      </div>
-    </div>
-  )
+  const [subjects,setSubjects]=useState<any[]>([]);
+  const [selectedSubject,setSelectedSubject]=useState("");
+  const [students,setStudents]=useState<any[]>([]);
+  const [tallies,setTallies]=useState<Record<string,number>>({});
+  const [notes,setNotes]=useState("");
+  const [date,setDate]=useState("");
+  const [saving,setSaving]=useState(false);
+  const [loading,setLoading]=useState(true);
+  const [message,setMessage]=useState("");
+  useEffect(()=>{setDate(new Date().toLocaleDateString("en-CA"));supabase.from("subjects").select("*").eq("archived",false).then(({data,error})=>{if(error)setMessage("Unable to load subjects.");if(data?.length){setSubjects(data);setSelectedSubject(data[0].id);}else setLoading(false);});},[]);
+  useEffect(()=>{if(!selectedSubject||!date)return;let active=true;setLoading(true);const load=async()=>{const [{data:stds,error:se},{data:recs,error:re},{data:noteData,error:ne}]=await Promise.all([supabase.from("students").select("*").eq("archived",false).order("seat_row").order("seat_col"),supabase.from("recitation").select("*").eq("subject_id",selectedSubject).eq("date",date),supabase.from("daily_notes").select("*").eq("subject_id",selectedSubject).eq("date",date).maybeSingle()]);if(!active)return;if(se||re||ne)setMessage("Some class data could not be loaded. Please try again.");const roster=stds||[];setStudents(roster);const next:Record<string,number>={};roster.forEach(s=>next[s.id]=0);recs?.forEach(r=>next[r.student_id]=r.times_called);setTallies(next);setNotes(noteData?.notes||"");setLoading(false);};load();return()=>{active=false;};},[selectedSubject,date]);
+  const addTally=(id:string)=>setTallies(prev=>({...prev,[id]:(prev[id]||0)+1}));
+  const subtractTally=(e:React.MouseEvent,id:string)=>{e.preventDefault();setTallies(prev=>({...prev,[id]:Math.max(0,(prev[id]||0)-1)}));};
+  const saveRecitation=async()=>{if(!selectedSubject||!date)return;setSaving(true);setMessage("");const {data:{user}}=await supabase.auth.getUser();if(!user){setSaving(false);setMessage("Your session has expired. Please sign in again.");return;}const records=students.filter(s=>(tallies[s.id]||0)>0).map(s=>({user_id:user.id,date,subject_id:selectedSubject,student_id:s.id,times_called:tallies[s.id]}));const {error:de}=await supabase.from("recitation").delete().match({user_id:user.id,date,subject_id:selectedSubject});if(de){setSaving(false);setMessage("Could not update recitation: "+de.message);return;}if(records.length){const {error}=await supabase.from("recitation").insert(records);if(error){setSaving(false);setMessage("Could not save recitation: "+error.message);return;}}const {error:ne}=await supabase.from("daily_notes").upsert({user_id:user.id,date,subject_id:selectedSubject,notes},{onConflict:"user_id,date,subject_id"});setSaving(false);setMessage(ne?"Recitation was saved, but notes could not be saved: "+ne.message:"Recitation and class notes saved successfully.");};
+  const total=Object.values(tallies).reduce((sum,count)=>sum+count,0);
+  const maxCol=Math.max(...students.map(s=>s.seat_col||1),1);
+  return <div className="min-h-screen"><AppHeader/><main className="page-container"><Link href="/" className="page-back">← Back to dashboard</Link><header className="page-heading"><div><p className="eyebrow">Daily classroom workflow</p><h1 className="page-title">Recitation log</h1><p className="page-description">Tap a student to add a tally. Right-click to subtract on desktop.</p></div><button onClick={saveRecitation} disabled={saving||loading||!selectedSubject} className="btn btn-primary">{saving?"Saving…":"Save recitation"}</button></header>
+    <section className="panel panel-pad mb-5"><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><label><span className="field-label">Subject</span><select value={selectedSubject} onChange={e=>setSelectedSubject(e.target.value)} className="field">{subjects.length===0&&<option value="">No subjects found</option>}{subjects.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><label><span className="field-label">Date</span><input type="date" value={date} onChange={e=>setDate(e.target.value)} className="field"/></label></div></section>
+    <div className="mb-5 grid grid-cols-2 gap-3"><div className="stat-card"><p className="stat-label">Total recitations</p><p className="stat-value">{total}</p></div><div className="stat-card"><p className="stat-label">Students participating</p><p className="stat-value">{Object.values(tallies).filter(v=>v>0).length}</p></div></div>{message&&<p role="status" className="notice mb-4">{message}</p>}
+    <section className="panel panel-pad"><div className="mb-4 flex flex-wrap items-center justify-between gap-2"><div><h2 className="panel-title">Class seating chart</h2><p className="panel-subtitle">Tap to add a participation count. Counts never go below zero.</p></div><span className="text-xs" style={{color:"var(--muted)"}}>{students.length} students</span></div>{loading?<div className="empty-state">Loading recitation log…</div>:students.length===0?<div className="empty-state"><strong>No students found</strong>Add students in your seating chart to begin logging recitations.</div>:<div className="overflow-x-auto pb-2"><div className="seat-grid" style={{gridTemplateColumns:"repeat("+maxCol+", minmax(94px, 1fr))"}}>{students.map(s=><button type="button" key={s.id} onClick={()=>addTally(s.id)} onContextMenu={e=>subtractTally(e,s.id)} className={"seat "+((tallies[s.id]||0)>0?"seat-selected":"")} style={{gridRow:s.seat_row||1,gridColumn:s.seat_col||1}} aria-label={s.name+", "+(tallies[s.id]||0)+" recitations. Tap to add one."}><span>{s.name}</span><span className="seat-count">{tallies[s.id]||0}</span></button>)}</div></div>}</section>
+    <section className="panel panel-pad mt-5"><label htmlFor="class-notes" className="field-label">Class notes <span className="font-normal">(optional)</span></label><p className="panel-subtitle mb-3">Add a short note about today’s class or recitation.</p><textarea id="class-notes" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. All students will receive full credit for bringing their assignment." className="field min-h-28 resize-y"/></section></main></div>;
 }
