@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
+import AppHeader from '@/app/components/AppHeader'
 
 export default function Attendance() {
   const [subjects, setSubjects] = useState<any[]>([])
@@ -83,8 +84,9 @@ export default function Attendance() {
   const maxCol = Math.max(...students.map(s => s.seat_col), 0)
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 md:p-8">
-      <div className="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow">
+    <div className="min-h-screen bg-gray-100">
+      <AppHeader />
+      <div className="max-w-5xl mx-auto mt-8 px-4 pb-8">
         <Link href="/" className="text-blue-500 text-sm mb-4 block">← Back to Dashboard</Link>
         
         <div className="flex flex-col md:flex-row gap-4 mb-8">
