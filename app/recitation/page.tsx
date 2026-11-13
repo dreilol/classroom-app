@@ -4,56 +4,94 @@ import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import AppHeader from "@/app/components/AppHeader";
 
-export default function Recitation() {
+export default function Attendance() {
   const [subjects,setSubjects]=useState<any[]>([]);
   const [selectedSubject,setSelectedSubject]=useState("");
   const [students,setStudents]=useState<any[]>([]);
-  const [tallies,setTallies]=useState<Record<string,number>>({});
+  const [statuses,setStatuses]=useState<Record<string,string>>({});
   const [notes,setNotes]=useState("");
   const [date,setDate]=useState("");
   const [saving,setSaving]=useState(false);
   const [loading,setLoading]=useState(true);
   const [message,setMessage]=useState("");
-  
-  useEffect(()=>{setDate(new Date().toLocaleDateString("en-CA"));supabase.from("subjects").select("*").eq("archived",false).then(({data,error})=>{if(error)setMessage("Unable to load subjects.");if(data?.length){setSubjects(data);setSelectedSubject(data[0].id);}else setLoading(false);});},[]);
-  
-  useEffect(()=>{if(!selectedSubject||!date)return;let active=true;setLoading(true);const load=async()=>{const [{data:stds,error:se},{data:recs,error:re},{data:noteData,error:ne}]=await Promise.all([supabase.from("students").select("*").eq("archived",false).order("seat_row").order("seat_col"),supabase.from("recitation").select("*").eq("subject_id",selectedSubject).eq("date",date),supabase.from("daily_notes").select("*").eq("subject_id",selectedSubject).eq("date",date).maybeSingle()]);if(!active)return;if(se||re||ne)setMessage("Some class data could not be loaded. Please try again.");const roster=stds||[];setStudents(roster);const next:Record<string,number>={};roster.forEach(s=>next[s.id]=0);recs?.forEach(r=>next[r.student_id]=r.times_called);setTallies(next);setNotes(noteData?.notes||"");setLoading(false);};load();return()=>{active=false;};},[selectedSubject,date]);
-  
-  const addTally=(id:string)=>setTallies(prev=>({...prev,[id]:(prev[id]||0)+1}));
-  const subtractTally=(e:React.MouseEvent,id:string)=>{e.preventDefault();setTallies(prev=>({...prev,[id]:Math.max(0,(prev[id]||0)-1)}));};
-  
-  const saveRecitation=async()=>{
+
+  useEffect(()=>{
+    setDate(new Date().toLocaleDateString("en-CA"));
+    supabase.from("subjects").select("*").eq("archived",false).then(({data,error})=>{
+      if(error)setMessage("Unable to load subjects.");
+      if(data?.length){setSubjects(data);setSelectedSubject(data[0].id);}
+      else setLoading(false);
+    });
+  },[]);
+
+  useEffect(()=>{
     if(!selectedSubject||!date)return;
+    let active=true;setLoading(true);
+    const load=async()=>{
+      const [{data:stds,error:studentsError},{data:att,error:attendanceError},{data:noteData,error:notesError}]=await Promise.all([
+        supabase.from("students").select("*").eq("archived",false).order("seat_row").order("seat_col"),
+        supabase.from("attendance").select("*").eq("subject_id",selectedSubject).eq("date",date),
+        supabase.from("daily_notes").select("*").eq("subject_id",selectedSubject).eq("date",date).maybeSingle()
+      ]);
+      if(!active)return;
+      if(studentsError||attendanceError||notesError)setMessage("Some attendance data could not be loaded. Please try again.");
+      
+      const roster=stds||[];setStudents(roster);
+      
+      const next:Record<string,string>={};roster.forEach(s=>next[s.id]="P");att?.forEach(a=>next[a.student_id]=a.status);setStatuses(next);
+      setNotes(noteData?.notes||"");
+      setLoading(false);
+    };
+    load();return()=>{active=false;};
+  },[selectedSubject,date]);
+  
+  const toggleStatus=(id:string)=>setStatuses(prev=>({...prev,[id]:prev[id]==="P"?"A":prev[id]==="A"?"L":"P"}));
+  
+  const saveAttendance=async()=>{
+    if(!selectedSubject||!date||students.length===0)return;
     setSaving(true);setMessage("");
     const {data:{user}}=await supabase.auth.getUser();
-    if(!user){setSaving(false);setMessage("Your session has expired. Please sign in again.");return;}
-    const records=students.filter(s=>(tallies[s.id]||0)>0).map(s=>({user_id:user.id,date,subject_id:selectedSubject,student_id:s.id,times_called:tallies[s.id]}));
-    const {error:de}=await supabase.from("recitation").delete().match({user_id:user.id,date,subject_id:selectedSubject});
-    if(de){setSaving(false);setMessage("Could not update recitation: "+de.message);return;}
-    if(records.length){const {error}=await supabase.from("recitation").insert(records);if(error){setSaving(false);setMessage("Could not save recitation: "+error.message);return;}}
-    const {error:ne}=await supabase.from("daily_notes").upsert({user_id:user.id,date,subject_id:selectedSubject,notes},{onConflict:"user_id,date,subject_id"});
-    setSaving(false);setMessage(ne?"Recitation was saved, but notes could not be saved: "+ne.message:"Recitation and class notes saved successfully.");
+    if(!user){setSaving(false);return;}
+
+    // 1. Save Attendance
+    const records=students.map(s=>({user_id:user.id,date,subject_id:selectedSubject,student_id:s.id,status:statuses[s.id]||"P"}));
+    const {error:attError}=await supabase.from("attendance").upsert(records,{onConflict:"user_id,date,subject_id,student_id"});
+    
+    if(attError){
+      setSaving(false);
+      setMessage("Could not save attendance: "+attError.message);
+      return;
+    }
+
+    // 2. Save Notes
+    const {error:notesError}=await supabase.from("daily_notes").upsert(
+      {user_id:user.id,date,subject_id:selectedSubject,notes},
+      {onConflict:"user_id,date,subject_id"}
+    );
+
+    setSaving(false);
+    setMessage(notesError?"Attendance saved, but notes failed: "+notesError.message:"Attendance and notes saved successfully.");
   };
 
-  const deleteRecitation=async()=>{
-    if(!confirm("Are you sure you want to delete all recitation tallies and notes for this date and subject?"))return;
+  const deleteAttendance=async()=>{
+    if(!confirm("Are you sure you want to delete the attendance for this date and subject? This cannot be undone."))return;
     if(!selectedSubject||!date)return;
     setSaving(true);setMessage("");
     const {data:{user}}=await supabase.auth.getUser();
     
-    // Delete both tallies and the notes
-    await supabase.from("recitation").delete().match({user_id:user?.id,date,subject_id:selectedSubject});
+    // Delete both attendance and the notes for the day
+    await supabase.from("attendance").delete().match({user_id:user?.id,date,subject_id:selectedSubject});
     await supabase.from("daily_notes").delete().match({user_id:user?.id,date,subject_id:selectedSubject});
     
-    setMessage("Recitation log deleted.");
-    const reset:Record<string,number>={};
-    students.forEach(s=>reset[s.id]=0);
-    setTallies(reset);
+    setMessage("Attendance log deleted.");
+    const reset:Record<string,string>={};
+    students.forEach(s=>reset[s.id]="P");
+    setStatuses(reset);
     setNotes("");
     setSaving(false);
   };
 
-  const total=Object.values(tallies).reduce((sum,count)=>sum+count,0);
+  const counts={P:Object.values(statuses).filter(v=>v==="P").length,A:Object.values(statuses).filter(v=>v==="A").length,L:Object.values(statuses).filter(v=>v==="L").length};
   const maxCol=Math.max(...students.map(s=>s.seat_col||1),1);
   
   return <div className="min-h-screen"><AppHeader/><main className="page-container">
@@ -62,21 +100,66 @@ export default function Recitation() {
     <header className="page-heading">
       <div>
         <p className="eyebrow">Daily classroom workflow</p>
-        <h1 className="page-title">Recitation log</h1>
-        <p className="page-description">Tap a student to add a tally. Right-click to subtract on desktop.</p>
+        <h1 className="page-title">Attendance</h1>
+        <p className="page-description">Tap a student's seat to cycle through present, absent, and late.</p>
       </div>
       <div className="flex gap-2 items-center">
-        <button onClick={deleteRecitation} disabled={saving||loading||!selectedSubject} className="btn bg-transparent border border-gray-300 text-gray-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200">
+        <button onClick={deleteAttendance} disabled={saving||loading||!students.length} className="btn bg-transparent border border-gray-300 text-gray-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200">
           Delete log
         </button>
-        <button onClick={saveRecitation} disabled={saving||loading||!selectedSubject} className="btn btn-primary">
-          {saving?"Saving…":"Save recitation"}
+        <button onClick={saveAttendance} disabled={saving||loading||!students.length} className="btn btn-primary">
+          {saving?"Saving…":"Save attendance"}
         </button>
       </div>
     </header>
     
-    <section className="panel panel-pad mb-5"><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><label><span className="field-label">Subject</span><select value={selectedSubject} onChange={e=>setSelectedSubject(e.target.value)} className="field">{subjects.length===0&&<option value="">No subjects found</option>}{subjects.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><label><span className="field-label">Date</span><input type="date" value={date} onChange={e=>setDate(e.target.value)} className="field"/></label></div></section>
-    <div className="mb-5 grid grid-cols-2 gap-3"><div className="stat-card"><p className="stat-label">Total recitations</p><p className="stat-value">{total}</p></div><div className="stat-card"><p className="stat-label">Students participating</p><p className="stat-value">{Object.values(tallies).filter(v=>v>0).length}</p></div></div>{message&&<p role="status" className="notice mb-4">{message}</p>}
-    <section className="panel panel-pad"><div className="mb-4 flex flex-wrap items-center justify-between gap-2"><div><h2 className="panel-title">Class seating chart</h2><p className="panel-subtitle">Tap to add a participation count. Counts never go below zero.</p></div><span className="text-xs" style={{color:"var(--muted)"}}>{students.length} students</span></div>{loading?<div className="empty-state">Loading recitation log…</div>:students.length===0?<div className="empty-state"><strong>No students found</strong>Add students in your seating chart to begin logging recitations.</div>:<div className="overflow-x-auto pb-2"><div className="seat-grid" style={{gridTemplateColumns:"repeat("+maxCol+", minmax(94px, 1fr))"}}>{students.map(s=><button type="button" key={s.id} onClick={()=>addTally(s.id)} onContextMenu={e=>subtractTally(e,s.id)} className={"seat "+((tallies[s.id]||0)>0?"seat-selected":"")} style={{gridRow:s.seat_row||1,gridColumn:s.seat_col||1}} aria-label={s.name+", "+(tallies[s.id]||0)+" recitations. Tap to add one."}><span>{s.name}</span><span className="seat-count">{tallies[s.id]||0}</span></button>)}</div></div>}</section>
-    <section className="panel panel-pad mt-5"><label htmlFor="class-notes" className="field-label">Class notes <span className="font-normal">(optional)</span></label><p className="panel-subtitle mb-3">Add a short note about today’s class or recitation.</p><textarea id="class-notes" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. All students will receive full credit for bringing their assignment." className="field min-h-28 resize-y"/></section></main></div>;
+    <section className="panel panel-pad mb-5">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label>
+          <span className="field-label">Subject</span>
+          <select value={selectedSubject} onChange={e=>setSelectedSubject(e.target.value)} className="field">
+            {subjects.length===0&&<option value="">No subjects found</option>}
+            {subjects.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </label>
+        <label>
+          <span className="field-label">Date</span>
+          <input type="date" value={date} onChange={e=>setDate(e.target.value)} className="field"/>
+        </label>
+      </div>
+    </section>
+    
+    <div className="mb-4 grid grid-cols-3 gap-3">
+      <div className="stat-card"><p className="stat-label">Present</p><p className="stat-value" style={{color:"var(--success)"}}>{counts.P}</p></div>
+      <div className="stat-card"><p className="stat-label">Absent</p><p className="stat-value" style={{color:"var(--danger)"}}>{counts.A}</p></div>
+      <div className="stat-card"><p className="stat-label">Late</p><p className="stat-value" style={{color:"var(--warning)"}}>{counts.L}</p></div>
+    </div>
+    
+    {message&&<p role="status" className="notice mb-4">{message}</p>}
+    
+    <section className="panel panel-pad">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="panel-title">Class seating chart</h2>
+          <p className="panel-subtitle">Tap a student to change their status.</p>
+        </div>
+        <span className="text-xs" style={{color:"var(--muted)"}}>{students.length} students</span>
+      </div>
+      {loading?<div className="empty-state">Loading attendance…</div>:students.length===0?<div className="empty-state"><strong>No students found</strong>Add students in your seating chart before taking attendance.</div>:<div className="overflow-x-auto pb-2"><div className="seat-grid" style={{gridTemplateColumns:`repeat(${maxCol}, minmax(94px, 1fr))`}}>{students.map(s=>{const status=statuses[s.id]||"P";const cls=status==="P"?"seat-present":status==="A"?"seat-absent":"seat-late";const label=status==="P"?"Present":status==="A"?"Absent":"Late";return <button type="button" key={s.id} onClick={()=>toggleStatus(s.id)} className={`seat ${cls}`} style={{gridRow:s.seat_row||1,gridColumn:s.seat_col||1}} aria-label={`${s.name}: ${label}. Tap to change.`}><span>{s.name}</span><span className="text-[10px] font-bold uppercase tracking-wide">{label}</span></button>;})}</div></div>}
+    </section>
+
+    {/* NEW ATTENDANCE NOTES SECTION */}
+    <section className="panel panel-pad mt-5">
+      <label htmlFor="class-notes" className="field-label">Attendance notes <span className="font-normal">(optional)</span></label>
+      <p className="panel-subtitle mb-3">Add a short note about why students are absent, class suspensions, etc.</p>
+      <textarea 
+        id="class-notes" 
+        value={notes} 
+        onChange={e=>setNotes(e.target.value)} 
+        placeholder="e.g. 3 students absent due to dental checkup." 
+        className="field min-h-28 resize-y"
+      />
+    </section>
+
+  </main></div>;
 }
