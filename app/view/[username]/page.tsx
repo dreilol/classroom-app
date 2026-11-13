@@ -2,7 +2,6 @@
 import { useEffect, useState, Suspense } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useParams } from 'next/navigation'
-import AppHeader from '@/app/components/AppHeader'
 
 // 1. The Inner Component (contains all logic and UI)
 function GuestViewContent() {
@@ -67,7 +66,7 @@ function GuestViewContent() {
   }, [date])
 
   return (
-    <div className="min-h-screen"><AppHeader /><div className="page-container">
+    <div className="min-h-screen"><div className="page-container">
       <div className="mx-auto max-w-4xl">
         
         {/* Header */}
