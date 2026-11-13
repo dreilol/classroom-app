@@ -1,135 +1,53 @@
-'use client'
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
-import Link from 'next/link'
-import AppHeader from '@/app/components/AppHeader'
+"use client";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import Link from "next/link";
+import AppHeader from "@/app/components/AppHeader";
 
 export default function Attendance() {
-  const [subjects, setSubjects] = useState<any[]>([])
-  const [selectedSubject, setSelectedSubject] = useState('')
-  const [students, setStudents] = useState<any[]>([])
-  const [statuses, setStatuses] = useState<Record<string, string>>({})
- const [date, setDate] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [subjects,setSubjects]=useState<any[]>([]);
+  const [selectedSubject,setSelectedSubject]=useState("");
+  const [students,setStudents]=useState<any[]>([]);
+  const [statuses,setStatuses]=useState<Record<string,string>>({});
+  const [date,setDate]=useState("");
+  const [saving,setSaving]=useState(false);
+  const [loading,setLoading]=useState(true);
+  const [message,setMessage]=useState("");
 
-
-   // 1. Fetch Subjects & Set Today's Date
-  useEffect(() => {
-    // Set date to today safely on the client side
-    setDate(new Date().toISOString().split('T')[0])
-
-    supabase.from('subjects').select('*').eq('archived', false).then(({ data }) => {
-      if (data && data.length > 0) {
-        setSubjects(data)
-        setSelectedSubject(data[0].id)
-      }
-    })
-  }, [])
-
-  // 2. Fetch Students & Existing Attendance when Subject or Date changes
-  useEffect(() => {
-    if (!selectedSubject) return
-    const fetchData = async () => {
-      // Get students
-      const { data: stds } = await supabase.from('students').select('*').eq('archived', false).order('seat_row').order('seat_col')
-      if (!stds) return
-      setStudents(stds)
-
-      // Get existing attendance for this date/subject
-      const { data: att } = await supabase.from('attendance').select('*').eq('subject_id', selectedSubject).eq('date', date)
-      
-      // Default everyone to 'P' (Present), unless they already have a saved status
-      const newStatuses: Record<string, string> = {}
-      stds.forEach(s => newStatuses[s.id] = 'P') 
-      att?.forEach(a => newStatuses[a.student_id] = a.status)
-      setStatuses(newStatuses)
-    }
-    fetchData()
-  }, [selectedSubject, date])
-
-  // 3. Toggle Status: Present -> Absent -> Late -> Present
-  const toggleStatus = (studentId: string) => {
-    setStatuses(prev => {
-      const current = prev[studentId]
-      const next = current === 'P' ? 'A' : current === 'A' ? 'L' : 'P' 
-      return { ...prev, [studentId]: next }
-    })
-  }
-
-  // 4. Save to Database
-  const saveAttendance = async () => {
-    setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    // Prepare data for upsert (update if exists, insert if not)
-    const records = students.map(s => ({
-      user_id: user?.id,
-      date,
-      subject_id: selectedSubject,
-      student_id: s.id,
-      status: statuses[s.id]
-    }))
-
-    const { error } = await supabase.from('attendance').upsert(records, { 
-      onConflict: 'user_id,date,subject_id,student_id' 
-    })
-    
-    setSaving(false)
-    if (error) alert("Error saving: " + error.message)
-    else alert("Attendance saved successfully!")
-  }
-
-  // Calculate grid size based on the students' seat positions
-  const maxRow = Math.max(...students.map(s => s.seat_row), 0)
-  const maxCol = Math.max(...students.map(s => s.seat_col), 0)
-
-  return (
-    <div className="min-h-screen bg-gray-100">
-      <AppHeader />
-      <div className="max-w-5xl mx-auto mt-8 px-4 pb-8">
-        <Link href="/" className="text-blue-500 text-sm mb-4 block">← Back to Dashboard</Link>
-        
-        <section className="mb-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5"><div className="mb-4"><h1 className="text-2xl font-bold tracking-tight text-gray-800">Attendance</h1><p className="mt-1 text-sm text-gray-500">Tap a seat to cycle through present, absent, and late.</p></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_190px_auto]">
-          <select value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)} className="p-2 border rounded text-black font-semibold">
-            {subjects.length === 0 && <option value="">No subjects found</option>}
-            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)} className="p-2 border rounded text-black" />
-          <button onClick={saveAttendance} disabled={saving || subjects.length === 0} className="bg-green-600 text-white px-6 py-2 rounded font-bold hover:bg-green-700 disabled:bg-gray-400">
-            {saving ? 'Saving...' : 'Save Attendance'}
-          </button>
-        </div></section>
-
-        <div className="mb-4 flex flex-wrap gap-3 text-sm">
-          <span className="flex items-center gap-1"><div className="w-4 h-4 bg-green-500 rounded"></div> Present</span>
-          <span className="flex items-center gap-1"><div className="w-4 h-4 bg-red-500 rounded"></div> Absent</span>
-          <span className="flex items-center gap-1"><div className="w-4 h-4 bg-yellow-400 rounded"></div> Late</span>
-        </div>
-
-        {/* The Seating Chart */}
-        <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5"><div className="mb-4 flex items-center justify-between"><h2 className="font-bold text-gray-800">Seating chart</h2><span className="text-xs text-gray-500">{students.length} students</span></div><div className="overflow-x-auto pb-4">
-          <div 
-            className="grid gap-2" 
-            style={{ gridTemplateColumns: `repeat(${maxCol || 1}, minmax(100px, 1fr))` }}
-          >
-            {students.map(student => {
-              const status = statuses[student.id] || 'P'
-              const bgColor = status === 'P' ? 'bg-green-500' : status === 'A' ? 'bg-red-500' : status === 'L' ? 'bg-yellow-400' : 'bg-gray-400'
-              return (
-                <div 
-                  key={student.id}
-                  onClick={() => toggleStatus(student.id)}
-                  className={`${bgColor} text-white p-2 rounded cursor-pointer text-xs font-bold text-center flex items-center justify-center min-h-[60px] shadow-sm select-none hover:opacity-80 transition`}
-                  style={{ gridRow: student.seat_row, gridColumn: student.seat_col }}
-                >
-                  {student.name}
-                </div>
-              )
-            })}
-          </div>
-        </div></section>
-
-      </div>
-    </div>
-  )
+  useEffect(()=>{setDate(new Date().toLocaleDateString("en-CA"));supabase.from("subjects").select("*").eq("archived",false).then(({data,error})=>{if(error)setMessage("Unable to load subjects.");if(data?.length){setSubjects(data);setSelectedSubject(data[0].id);}else setLoading(false);});},[]);
+  useEffect(()=>{
+    if(!selectedSubject||!date)return;
+    let active=true;setLoading(true);
+    const load=async()=>{
+      const [{data:stds,error:studentsError},{data:att,error:attendanceError}]=await Promise.all([
+        supabase.from("students").select("*").eq("archived",false).order("seat_row").order("seat_col"),
+        supabase.from("attendance").select("*").eq("subject_id",selectedSubject).eq("date",date)
+      ]);
+      if(!active)return;
+      if(studentsError||attendanceError)setMessage("Some attendance data could not be loaded. Please try again.");
+      const roster=stds||[];setStudents(roster);
+      const next:Record<string,string>={};roster.forEach(s=>next[s.id]="P");att?.forEach(a=>next[a.student_id]=a.status);setStatuses(next);setLoading(false);
+    };load();return()=>{active=false;};
+  },[selectedSubject,date]);
+  const toggleStatus=(id:string)=>setStatuses(prev=>({...prev,[id]:prev[id]==="P"?"A":prev[id]==="A"?"L":"P"}));
+  const saveAttendance=async()=>{
+    if(!selectedSubject||!date||students.length===0)return;
+    setSaving(true);setMessage("");
+    const {data:{user}}=await supabase.auth.getUser();
+    const records=students.map(s=>({user_id:user?.id,date,subject_id:selectedSubject,student_id:s.id,status:statuses[s.id]||"P"}));
+    const {error}=await supabase.from("attendance").upsert(records,{onConflict:"user_id,date,subject_id,student_id"});
+    setSaving(false);setMessage(error?"Could not save attendance: "+error.message:"Attendance saved successfully.");
+  };
+  const counts={P:Object.values(statuses).filter(v=>v==="P").length,A:Object.values(statuses).filter(v=>v==="A").length,L:Object.values(statuses).filter(v=>v==="L").length};
+  const maxCol=Math.max(...students.map(s=>s.seat_col||1),1);
+  return <div className="min-h-screen"><AppHeader/><main className="page-container">
+    <Link href="/" className="page-back">← Back to dashboard</Link>
+    <header className="page-heading"><div><p className="eyebrow">Daily classroom workflow</p><h1 className="page-title">Attendance</h1><p className="page-description">Tap a student's seat to cycle through present, absent, and late.</p></div><button onClick={saveAttendance} disabled={saving||loading||!students.length} className="btn btn-primary">{saving?"Saving…":"Save attendance"}</button></header>
+    <section className="panel panel-pad mb-5"><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><label><span className="field-label">Subject</span><select value={selectedSubject} onChange={e=>setSelectedSubject(e.target.value)} className="field">{subjects.length===0&&<option value="">No subjects found</option>}{subjects.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><label><span className="field-label">Date</span><input type="date" value={date} onChange={e=>setDate(e.target.value)} className="field"/></label></div></section>
+    <div className="mb-4 grid grid-cols-3 gap-3"><div className="stat-card"><p className="stat-label">Present</p><p className="stat-value" style={{color:"var(--success)"}}>{counts.P}</p></div><div className="stat-card"><p className="stat-label">Absent</p><p className="stat-value" style={{color:"var(--danger)"}}>{counts.A}</p></div><div className="stat-card"><p className="stat-label">Late</p><p className="stat-value" style={{color:"var(--warning)"}}>{counts.L}</p></div></div>
+    {message&&<p role="status" className="notice mb-4">{message}</p>}
+    <section className="panel panel-pad"><div className="mb-4 flex flex-wrap items-center justify-between gap-2"><div><h2 className="panel-title">Class seating chart</h2><p className="panel-subtitle">Tap a student to change their status.</p></div><span className="text-xs" style={{color:"var(--muted)"}}>{students.length} students</span></div>
+      {loading?<div className="empty-state">Loading attendance…</div>:students.length===0?<div className="empty-state"><strong>No students found</strong>Add students in your seating chart before taking attendance.</div>:<div className="overflow-x-auto pb-2"><div className="seat-grid" style={{gridTemplateColumns:`repeat(${maxCol}, minmax(94px, 1fr))`}}>{students.map(s=>{const status=statuses[s.id]||"P";const cls=status==="P"?"seat-present":status==="A"?"seat-absent":"seat-late";const label=status==="P"?"Present":status==="A"?"Absent":"Late";return <button type="button" key={s.id} onClick={()=>toggleStatus(s.id)} className={`seat ${cls}`} style={{gridRow:s.seat_row||1,gridColumn:s.seat_col||1}} aria-label={`${s.name}: ${label}. Tap to change.`}><span>{s.name}</span><span className="text-[10px] font-bold uppercase tracking-wide">{label}</span></button>;})}</div></div>}
+    </section>
+  </main></div>;
 }

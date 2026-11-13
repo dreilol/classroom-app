@@ -4,24 +4,27 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 
 type Theme = "light" | "dark";
 type ThemeContextValue = { theme: Theme; toggleTheme: () => void };
-
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>("light");
 
   useEffect(() => {
-    const stored = window.localStorage.getItem("classroom-theme");
-    const initial: Theme = stored === "dark" ? "dark" : "light";
-    setTheme(initial);
-    document.documentElement.dataset.theme = initial;
+    try {
+      const stored = window.localStorage.getItem("classroom-theme");
+      const initial: Theme = stored === "dark" ? "dark" : "light";
+      setTheme(initial);
+      document.documentElement.dataset.theme = initial;
+    } catch {
+      document.documentElement.dataset.theme = "light";
+    }
   }, []);
 
   const toggleTheme = useCallback(() => {
     setTheme((current) => {
-      const next = current === "light" ? "dark" : "light";
+      const next: Theme = current === "light" ? "dark" : "light";
       document.documentElement.dataset.theme = next;
-      window.localStorage.setItem("classroom-theme", next);
+      try { window.localStorage.setItem("classroom-theme", next); } catch { /* Storage may be unavailable. */ }
       return next;
     });
   }, []);

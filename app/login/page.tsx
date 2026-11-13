@@ -1,30 +1,39 @@
-'use client'
-import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+"use client";
+import { useState } from "react";
+import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function Login() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const router = useRouter()
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) setError(error.message)
-    else router.push('/')
-  }
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setLoading(false);
+    if (error) setError(error.message);
+    else router.push("/");
+  };
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100 p-4">
-      <form onSubmit={handleLogin} className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-7 shadow-xl sm:p-9">
-        <div className="mb-7 text-center"><div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-blue-600 text-xl font-black text-white">C</div><h1 className="text-2xl font-bold tracking-tight text-gray-800">Welcome back</h1><p className="mt-1 text-sm text-gray-500">Sign in to your classroom workspace</p></div>
-        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-        <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="mb-4 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-black outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100" required />
-        <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-2 border rounded mb-4 text-black" required />
-        <button type="submit" className="w-full rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60">Login</button>
-      </form>
-    </div>
-  )
+  return <main className="login-wrap">
+    <form onSubmit={handleLogin} className="login-card">
+      <Link href="/" className="app-brand mb-9"><span className="app-brand-mark">C</span><span>Classroom<span className="app-brand-muted">.space</span></span></Link>
+      <p className="eyebrow">Your teaching workspace</p>
+      <h1 className="page-title text-3xl">Welcome back</h1>
+      <p className="page-description mb-7">Sign in to continue to your classroom.</p>
+      {error && <div role="alert" className="mb-4 rounded-xl p-3 text-sm" style={{ background: "var(--danger-soft)", color: "var(--danger)" }}>{error}</div>}
+      <label className="field-label" htmlFor="email">Email address</label>
+      <input id="email" type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} className="field mb-4" required />
+      <label className="field-label" htmlFor="password">Password</label>
+      <input id="password" type="password" autoComplete="current-password" placeholder="Enter your password" value={password} onChange={e => setPassword(e.target.value)} className="field mb-6" required />
+      <button type="submit" disabled={loading} className="btn btn-primary w-full">{loading ? "Signing in…" : "Sign in"}</button>
+      <p className="mt-6 text-center text-xs" style={{ color: "var(--muted)" }}>A simple space for your classroom, every day.</p>
+    </form>
+  </main>;
 }
