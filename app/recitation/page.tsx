@@ -163,7 +163,7 @@ export default function Recitation() {
             placeholder="e.g., All students will receive a 10/10 for their recitation today."
             className="w-full p-3 border rounded text-black h-24 resize-none"
           />
-        </div>
+        </section>
 
       </div>
     </div>
