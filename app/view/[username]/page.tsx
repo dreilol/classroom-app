@@ -67,23 +67,23 @@ function GuestViewContent() {
   }, [date])
 
   return (
-    <div className="min-h-screen bg-slate-50"><AppHeader /><div className="px-4 py-8 md:px-8">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen"><AppHeader /><div className="page-container">
+      <div className="mx-auto max-w-4xl">
         
         {/* Header */}
-        <div className="bg-slate-800 text-white p-6 rounded-t-xl text-center">
+        <div className="hero-panel text-center">
           <h1 className="text-2xl font-bold">Class Daily Digest</h1>
           <p className="text-slate-300 mt-1">Attendance & Recitation Records</p>
         </div>
 
         {/* Date Dropdown */}
-        <div className="bg-white p-4 shadow-sm border-b flex justify-center items-center gap-4">
-          <label className="font-semibold text-gray-700">Select Date:</label>
+        <div className="panel panel-pad flex flex-wrap justify-center items-center gap-4">
+          <label className="text-sm font-semibold">Select Date:</label>
           {availableDates.length > 0 ? (
             <select 
               value={date} 
               onChange={e => setDate(e.target.value)} 
-              className="p-2 border rounded text-black font-semibold cursor-pointer outline-none focus:ring-2 focus:ring-blue-500"
+              className="field w-auto min-w-48 font-semibold"
             >
               {availableDates.map(d => (
                 <option key={d} value={d}>
@@ -97,11 +97,11 @@ function GuestViewContent() {
         </div>
 
         {/* Content */}
-        <div className="bg-slate-100 p-4 md:p-6 rounded-b-xl border border-t-0 shadow-sm min-h-[50vh]">
+        <div className="panel panel-pad mt-4 min-h-[50vh]">
           {loading ? (
-            <p className="text-center text-gray-500 mt-10">Loading records...</p>
+            <p className="empty-state mt-8">Loading records...</p>
           ) : availableDates.length === 0 ? (
-            <div className="text-center text-gray-500 mt-10">
+            <div className="empty-state mt-8">
               <p>The teacher hasn't logged any attendance or recitation yet.</p>
             </div>
           ) : (
@@ -124,16 +124,16 @@ function GuestViewContent() {
                 if (subAtt.length === 0 && subRec.length === 0 && !subNote) return null
 
                 return (
-                  <div key={subject.id} className="bg-white rounded-lg shadow p-5 border-l-4 border-blue-500">
-                    <h2 className="text-xl font-bold text-gray-800 mb-4">{subject.name}</h2>
+                  <div key={subject.id} className="panel panel-pad">
+                    <h2 className="panel-title mb-4">{subject.name}</h2>
                     
                     {subAtt.length > 0 && (
                       <div className="mb-6">
-                        <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-2">Attendance</h3>
-                        <div className="flex gap-4">
-                          <div className="bg-green-50 text-green-700 px-4 py-2 rounded-lg font-semibold border border-green-200">Present: {present}</div>
-                          <div className="bg-red-50 text-red-700 px-4 py-2 rounded-lg font-semibold border border-red-200">Absent: {absent}</div>
-                          <div className="bg-yellow-50 text-yellow-700 px-4 py-2 rounded-lg font-semibold border border-yellow-200">Late: {late}</div>
+                        <h3 className="field-label mb-2">Attendance</h3>
+                        <div className="flex flex-wrap gap-3">
+                          <div className="status-pill status-present">Present: {present}</div>
+                          <div className="status-pill status-absent">Absent: {absent}</div>
+                          <div className="status-pill status-late">Late: {late}</div>
                         </div>
                       </div>
                     )}
@@ -141,9 +141,9 @@ function GuestViewContent() {
                     {recDetails.length > 0 && (
                       <div className="mb-4">
                         <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-2">Recitation Tally</h3>
-                        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-700">
+                        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                           {recDetails.map((r, i) => (
-                            <li key={i} className="flex justify-between border-b pb-1">
+                            <li key={i} className="list-row">
                               <span>{r.name}</span>
                               <span className="font-bold">{r.count} times</span>
                             </li>
@@ -153,7 +153,7 @@ function GuestViewContent() {
                     )}
 
                     {subNote && subNote.notes && (
-                      <div className="bg-blue-50 p-3 rounded text-sm text-blue-900 italic border border-blue-100 mt-4">
+                      <div className="notice mt-4">
                         <strong>Notes:</strong> {subNote.notes}
                       </div>
                     )}
