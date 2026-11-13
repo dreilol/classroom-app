@@ -14,14 +14,67 @@ export default function Recitation() {
   const [saving,setSaving]=useState(false);
   const [loading,setLoading]=useState(true);
   const [message,setMessage]=useState("");
+  
   useEffect(()=>{setDate(new Date().toLocaleDateString("en-CA"));supabase.from("subjects").select("*").eq("archived",false).then(({data,error})=>{if(error)setMessage("Unable to load subjects.");if(data?.length){setSubjects(data);setSelectedSubject(data[0].id);}else setLoading(false);});},[]);
+  
   useEffect(()=>{if(!selectedSubject||!date)return;let active=true;setLoading(true);const load=async()=>{const [{data:stds,error:se},{data:recs,error:re},{data:noteData,error:ne}]=await Promise.all([supabase.from("students").select("*").eq("archived",false).order("seat_row").order("seat_col"),supabase.from("recitation").select("*").eq("subject_id",selectedSubject).eq("date",date),supabase.from("daily_notes").select("*").eq("subject_id",selectedSubject).eq("date",date).maybeSingle()]);if(!active)return;if(se||re||ne)setMessage("Some class data could not be loaded. Please try again.");const roster=stds||[];setStudents(roster);const next:Record<string,number>={};roster.forEach(s=>next[s.id]=0);recs?.forEach(r=>next[r.student_id]=r.times_called);setTallies(next);setNotes(noteData?.notes||"");setLoading(false);};load();return()=>{active=false;};},[selectedSubject,date]);
+  
   const addTally=(id:string)=>setTallies(prev=>({...prev,[id]:(prev[id]||0)+1}));
   const subtractTally=(e:React.MouseEvent,id:string)=>{e.preventDefault();setTallies(prev=>({...prev,[id]:Math.max(0,(prev[id]||0)-1)}));};
-  const saveRecitation=async()=>{if(!selectedSubject||!date)return;setSaving(true);setMessage("");const {data:{user}}=await supabase.auth.getUser();if(!user){setSaving(false);setMessage("Your session has expired. Please sign in again.");return;}const records=students.filter(s=>(tallies[s.id]||0)>0).map(s=>({user_id:user.id,date,subject_id:selectedSubject,student_id:s.id,times_called:tallies[s.id]}));const {error:de}=await supabase.from("recitation").delete().match({user_id:user.id,date,subject_id:selectedSubject});if(de){setSaving(false);setMessage("Could not update recitation: "+de.message);return;}if(records.length){const {error}=await supabase.from("recitation").insert(records);if(error){setSaving(false);setMessage("Could not save recitation: "+error.message);return;}}const {error:ne}=await supabase.from("daily_notes").upsert({user_id:user.id,date,subject_id:selectedSubject,notes},{onConflict:"user_id,date,subject_id"});setSaving(false);setMessage(ne?"Recitation was saved, but notes could not be saved: "+ne.message:"Recitation and class notes saved successfully.");};
+  
+  const saveRecitation=async()=>{
+    if(!selectedSubject||!date)return;
+    setSaving(true);setMessage("");
+    const {data:{user}}=await supabase.auth.getUser();
+    if(!user){setSaving(false);setMessage("Your session has expired. Please sign in again.");return;}
+    const records=students.filter(s=>(tallies[s.id]||0)>0).map(s=>({user_id:user.id,date,subject_id:selectedSubject,student_id:s.id,times_called:tallies[s.id]}));
+    const {error:de}=await supabase.from("recitation").delete().match({user_id:user.id,date,subject_id:selectedSubject});
+    if(de){setSaving(false);setMessage("Could not update recitation: "+de.message);return;}
+    if(records.length){const {error}=await supabase.from("recitation").insert(records);if(error){setSaving(false);setMessage("Could not save recitation: "+error.message);return;}}
+    const {error:ne}=await supabase.from("daily_notes").upsert({user_id:user.id,date,subject_id:selectedSubject,notes},{onConflict:"user_id,date,subject_id"});
+    setSaving(false);setMessage(ne?"Recitation was saved, but notes could not be saved: "+ne.message:"Recitation and class notes saved successfully.");
+  };
+
+  const deleteRecitation=async()=>{
+    if(!confirm("Are you sure you want to delete all recitation tallies and notes for this date and subject?"))return;
+    if(!selectedSubject||!date)return;
+    setSaving(true);setMessage("");
+    const {data:{user}}=await supabase.auth.getUser();
+    
+    // Delete both tallies and the notes
+    await supabase.from("recitation").delete().match({user_id:user?.id,date,subject_id:selectedSubject});
+    await supabase.from("daily_notes").delete().match({user_id:user?.id,date,subject_id:selectedSubject});
+    
+    setMessage("Recitation log deleted.");
+    const reset:Record<string,number>={};
+    students.forEach(s=>reset[s.id]=0);
+    setTallies(reset);
+    setNotes("");
+    setSaving(false);
+  };
+
   const total=Object.values(tallies).reduce((sum,count)=>sum+count,0);
   const maxCol=Math.max(...students.map(s=>s.seat_col||1),1);
-  return <div className="min-h-screen"><AppHeader/><main className="page-container"><Link href="/" className="page-back">← Back to dashboard</Link><header className="page-heading"><div><p className="eyebrow">Daily classroom workflow</p><h1 className="page-title">Recitation log</h1><p className="page-description">Tap a student to add a tally. Right-click to subtract on desktop.</p></div><button onClick={saveRecitation} disabled={saving||loading||!selectedSubject} className="btn btn-primary">{saving?"Saving…":"Save recitation"}</button></header>
+  
+  return <div className="min-h-screen"><AppHeader/><main className="page-container">
+    <Link href="/" className="page-back">← Back to dashboard</Link>
+    
+    <header className="page-heading">
+      <div>
+        <p className="eyebrow">Daily classroom workflow</p>
+        <h1 className="page-title">Recitation log</h1>
+        <p className="page-description">Tap a student to add a tally. Right-click to subtract on desktop.</p>
+      </div>
+      <div className="flex gap-2 items-center">
+        <button onClick={deleteRecitation} disabled={saving||loading||!selectedSubject} className="btn bg-transparent border border-gray-300 text-gray-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200">
+          Delete log
+        </button>
+        <button onClick={saveRecitation} disabled={saving||loading||!selectedSubject} className="btn btn-primary">
+          {saving?"Saving…":"Save recitation"}
+        </button>
+      </div>
+    </header>
+    
     <section className="panel panel-pad mb-5"><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><label><span className="field-label">Subject</span><select value={selectedSubject} onChange={e=>setSelectedSubject(e.target.value)} className="field">{subjects.length===0&&<option value="">No subjects found</option>}{subjects.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><label><span className="field-label">Date</span><input type="date" value={date} onChange={e=>setDate(e.target.value)} className="field"/></label></div></section>
     <div className="mb-5 grid grid-cols-2 gap-3"><div className="stat-card"><p className="stat-label">Total recitations</p><p className="stat-value">{total}</p></div><div className="stat-card"><p className="stat-label">Students participating</p><p className="stat-value">{Object.values(tallies).filter(v=>v>0).length}</p></div></div>{message&&<p role="status" className="notice mb-4">{message}</p>}
     <section className="panel panel-pad"><div className="mb-4 flex flex-wrap items-center justify-between gap-2"><div><h2 className="panel-title">Class seating chart</h2><p className="panel-subtitle">Tap to add a participation count. Counts never go below zero.</p></div><span className="text-xs" style={{color:"var(--muted)"}}>{students.length} students</span></div>{loading?<div className="empty-state">Loading recitation log…</div>:students.length===0?<div className="empty-state"><strong>No students found</strong>Add students in your seating chart to begin logging recitations.</div>:<div className="overflow-x-auto pb-2"><div className="seat-grid" style={{gridTemplateColumns:"repeat("+maxCol+", minmax(94px, 1fr))"}}>{students.map(s=><button type="button" key={s.id} onClick={()=>addTally(s.id)} onContextMenu={e=>subtractTally(e,s.id)} className={"seat "+((tallies[s.id]||0)>0?"seat-selected":"")} style={{gridRow:s.seat_row||1,gridColumn:s.seat_col||1}} aria-label={s.name+", "+(tallies[s.id]||0)+" recitations. Tap to add one."}><span>{s.name}</span><span className="seat-count">{tallies[s.id]||0}</span></button>)}</div></div>}</section>

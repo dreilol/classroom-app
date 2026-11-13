@@ -29,7 +29,9 @@ export default function Attendance() {
       const next:Record<string,string>={};roster.forEach(s=>next[s.id]="P");att?.forEach(a=>next[a.student_id]=a.status);setStatuses(next);setLoading(false);
     };load();return()=>{active=false;};
   },[selectedSubject,date]);
+  
   const toggleStatus=(id:string)=>setStatuses(prev=>({...prev,[id]:prev[id]==="P"?"A":prev[id]==="A"?"L":"P"}));
+  
   const saveAttendance=async()=>{
     if(!selectedSubject||!date||students.length===0)return;
     setSaving(true);setMessage("");
@@ -38,11 +40,48 @@ export default function Attendance() {
     const {error}=await supabase.from("attendance").upsert(records,{onConflict:"user_id,date,subject_id,student_id"});
     setSaving(false);setMessage(error?"Could not save attendance: "+error.message:"Attendance saved successfully.");
   };
+
+  const deleteAttendance=async()=>{
+    if(!confirm("Are you sure you want to delete the attendance for this date and subject? This cannot be undone."))return;
+    if(!selectedSubject||!date)return;
+    setSaving(true);setMessage("");
+    const {data:{user}}=await supabase.auth.getUser();
+    
+    const {error}=await supabase.from("attendance").delete().match({user_id:user?.id,date,subject_id:selectedSubject});
+    
+    if(error){
+      setMessage("Could not delete attendance: "+error.message);
+    }else{
+      setMessage("Attendance log deleted.");
+      const reset:Record<string,string>={};
+      students.forEach(s=>reset[s.id]="P");
+      setStatuses(reset);
+    }
+    setSaving(false);
+  };
+
   const counts={P:Object.values(statuses).filter(v=>v==="P").length,A:Object.values(statuses).filter(v=>v==="A").length,L:Object.values(statuses).filter(v=>v==="L").length};
   const maxCol=Math.max(...students.map(s=>s.seat_col||1),1);
+  
   return <div className="min-h-screen"><AppHeader/><main className="page-container">
     <Link href="/" className="page-back">← Back to dashboard</Link>
-    <header className="page-heading"><div><p className="eyebrow">Daily classroom workflow</p><h1 className="page-title">Attendance</h1><p className="page-description">Tap a student's seat to cycle through present, absent, and late.</p></div><button onClick={saveAttendance} disabled={saving||loading||!students.length} className="btn btn-primary">{saving?"Saving…":"Save attendance"}</button></header>
+    
+    <header className="page-heading">
+      <div>
+        <p className="eyebrow">Daily classroom workflow</p>
+        <h1 className="page-title">Attendance</h1>
+        <p className="page-description">Tap a student's seat to cycle through present, absent, and late.</p>
+      </div>
+      <div className="flex gap-2 items-center">
+        <button onClick={deleteAttendance} disabled={saving||loading||!students.length} className="btn bg-transparent border border-gray-300 text-gray-600 hover:bg-red-50 hover:text-red-600 hover:border-red-200">
+          Delete log
+        </button>
+        <button onClick={saveAttendance} disabled={saving||loading||!students.length} className="btn btn-primary">
+          {saving?"Saving…":"Save attendance"}
+        </button>
+      </div>
+    </header>
+    
     <section className="panel panel-pad mb-5"><div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><label><span className="field-label">Subject</span><select value={selectedSubject} onChange={e=>setSelectedSubject(e.target.value)} className="field">{subjects.length===0&&<option value="">No subjects found</option>}{subjects.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><label><span className="field-label">Date</span><input type="date" value={date} onChange={e=>setDate(e.target.value)} className="field"/></label></div></section>
     <div className="mb-4 grid grid-cols-3 gap-3"><div className="stat-card"><p className="stat-label">Present</p><p className="stat-value" style={{color:"var(--success)"}}>{counts.P}</p></div><div className="stat-card"><p className="stat-label">Absent</p><p className="stat-value" style={{color:"var(--danger)"}}>{counts.A}</p></div><div className="stat-card"><p className="stat-label">Late</p><p className="stat-value" style={{color:"var(--warning)"}}>{counts.L}</p></div></div>
     {message&&<p role="status" className="notice mb-4">{message}</p>}
