@@ -89,7 +89,7 @@ export default function Attendance() {
       <div className="max-w-5xl mx-auto mt-8 px-4 pb-8">
         <Link href="/" className="text-blue-500 text-sm mb-4 block">← Back to Dashboard</Link>
         
-        <div className="flex flex-col md:flex-row gap-4 mb-8">
+        <section className="mb-6 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5"><div className="mb-4"><h1 className="text-2xl font-bold tracking-tight text-gray-800">Attendance</h1><p className="mt-1 text-sm text-gray-500">Tap a seat to cycle through present, absent, and late.</p></div><div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_190px_auto]">
           <select value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)} className="p-2 border rounded text-black font-semibold">
             {subjects.length === 0 && <option value="">No subjects found</option>}
             {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -98,16 +98,16 @@ export default function Attendance() {
           <button onClick={saveAttendance} disabled={saving || subjects.length === 0} className="bg-green-600 text-white px-6 py-2 rounded font-bold hover:bg-green-700 disabled:bg-gray-400">
             {saving ? 'Saving...' : 'Save Attendance'}
           </button>
-        </div>
+        </div></section>
 
-        <div className="mb-4 text-sm flex gap-4">
+        <div className="mb-4 flex flex-wrap gap-3 text-sm">
           <span className="flex items-center gap-1"><div className="w-4 h-4 bg-green-500 rounded"></div> Present</span>
           <span className="flex items-center gap-1"><div className="w-4 h-4 bg-red-500 rounded"></div> Absent</span>
           <span className="flex items-center gap-1"><div className="w-4 h-4 bg-yellow-400 rounded"></div> Late</span>
         </div>
 
         {/* The Seating Chart */}
-        <div className="overflow-x-auto pb-4">
+        <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5"><div className="mb-4 flex items-center justify-between"><h2 className="font-bold text-gray-800">Seating chart</h2><span className="text-xs text-gray-500">{students.length} students</span></div><div className="overflow-x-auto pb-4">
           <div 
             className="grid gap-2" 
             style={{ gridTemplateColumns: `repeat(${maxCol || 1}, minmax(100px, 1fr))` }}
@@ -127,7 +127,7 @@ export default function Attendance() {
               )
             })}
           </div>
-        </div>
+        </div></section>
 
       </div>
     </div>
