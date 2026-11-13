@@ -40,6 +40,26 @@ export default function Dashboard() {
             <h2 className="text-xl font-semibold text-gray-800">📋 Take Attendance</h2>
             <p className="text-gray-500 text-sm mt-1">Open seating chart to mark Present/Absent</p>
           </Link>
+                    <Link href="/recitation" className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition border-l-4 border-orange-500 col-span-1 md:col-span-2 mt-4">
+            <h2 className="text-xl font-semibold text-gray-800">🗣️ Log Recitation</h2>
+            <p className="text-gray-500 text-sm mt-1">Tap students to add tallies for participation</p>
+          </Link>
+                    {/* Share Link */}
+          <div className="bg-white p-6 rounded-lg shadow border-l-4 border-gray-400 col-span-1 md:col-span-2 mt-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-800">🔗 Share Guest View</h2>
+              <p className="text-gray-500 text-sm mt-1">Send this link to other teachers</p>
+            </div>
+            <button 
+              onClick={() => {
+                navigator.clipboard.writeText(window.location.origin + '/view/class')
+                alert('Link copied to clipboard!')
+              }}
+              className="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-700"
+            >
+              Copy Link
+            </button>
+          </div>
         </div>
       </div>
     </div>
