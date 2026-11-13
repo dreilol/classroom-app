@@ -174,8 +174,8 @@ function GuestViewContent() {
                             
                             {absent > 0 && (
                               <div className="mb-3">
-                                <span className="font-bold text-red-600 block mb-1">Absent:</span>
-                                <ul className="list-disc list-inside text-slate-700 grid grid-cols-1 sm:grid-cols-2 gap-1">
+                                <span className="mb-1 block font-bold text-[var(--danger)]">Absent:</span>
+                                <ul className="grid grid-cols-1 gap-1 list-inside list-disc text-[var(--foreground)] sm:grid-cols-2">
                                   {subAtt.filter(a => a.status === 'A').map(a => {
                                     const student = students.find(s => s.id === a.student_id);
                                     return <li key={a.id}>{student?.name}</li>
@@ -186,7 +186,7 @@ function GuestViewContent() {
 
                             {late > 0 && (
                               <div className="mb-3">
-                                <span className="font-bold text-yellow-600 block mb-1">Late:</span>
+                                <span className="mb-1 block font-bold text-[var(--warning)]">Late:</span>
                                 <ul className="list-disc list-inside text-slate-700 grid grid-cols-1 sm:grid-cols-2 gap-1">
                                   {subAtt.filter(a => a.status === 'L').map(a => {
                                     const student = students.find(s => s.id === a.student_id);
@@ -198,7 +198,7 @@ function GuestViewContent() {
 
                             {present > 0 && (
                               <div>
-                                <span className="font-bold text-green-600 block mb-1">Present:</span>
+                                <span className="mb-1 block font-bold text-[var(--success)]">Present:</span>
                                 <ul className="list-disc list-inside text-slate-700 grid grid-cols-1 sm:grid-cols-2 gap-1">
                                   {subAtt.filter(a => a.status === 'P').map(a => {
                                     const student = students.find(s => s.id === a.student_id);
@@ -237,7 +237,7 @@ function GuestViewContent() {
               
             </div>
           )}
-        </div>
+          </section>
         </div>
       </div>
     </div>
