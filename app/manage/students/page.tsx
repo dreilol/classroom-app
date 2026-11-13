@@ -66,8 +66,8 @@ export default function ManageStudents() {
       <div className="max-w-5xl mx-auto mt-8 px-4 pb-8">
         <Link href="/" className="text-blue-500 text-sm mb-4 block">← Back to Dashboard</Link>
         
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">Classroom Layout</h1>
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div><h1 className="text-2xl font-bold tracking-tight text-gray-800">Classroom layout</h1><p className="mt-1 text-sm text-gray-500">Set up the seating chart and assign students.</p></div>
           <div className="flex gap-2 text-sm">
             <label>Rows: <input type="number" min="1" max="10" value={rows} onChange={e => setRows(Number(e.target.value))} className="w-16 p-1 border rounded text-black" /></label>
             <label>Cols: <input type="number" min="1" max="10" value={cols} onChange={e => setCols(Number(e.target.value))} className="w-16 p-1 border rounded text-black" /></label>
@@ -78,7 +78,7 @@ export default function ManageStudents() {
 
         {/* The Grid */}
         <div 
-          className="grid gap-2 mb-8" 
+          className="grid gap-2 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm mb-8" 
           style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
         >
           {grid.map(({ r, c }) => {
@@ -96,7 +96,7 @@ export default function ManageStudents() {
                     setName('')
                   }
                 }}
-                className={`p-2 h-20 rounded cursor-pointer border-2 flex flex-col items-center justify-center text-center transition-all
+                className={`min-h-20 rounded-xl cursor-pointer border-2 p-2 flex flex-col items-center justify-center text-center transition-all
                   ${student ? 'bg-blue-100 border-blue-400 hover:bg-red-100 hover:border-red-400' 
                             : isSelected ? 'bg-yellow-100 border-yellow-500 shadow-inner' 
                             : 'bg-gray-50 border-gray-200 hover:bg-gray-100'}`}
