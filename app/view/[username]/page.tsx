@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useParams } from 'next/navigation'
 
+export const dynamic = 'force-dynamic';
+
 export default function GuestView() {
   const params = useParams()
   
