@@ -1,56 +1,52 @@
-'use client'
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
-import Link from 'next/link'
-import AppHeader from '@/app/components/AppHeader'
+"use client";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import Link from "next/link";
+import AppHeader from "@/app/components/AppHeader";
 
 export default function ManageSubjects() {
-  const [subjects, setSubjects] = useState<any[]>([])
-  const [newSubject, setNewSubject] = useState('')
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [newSubject, setNewSubject] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
 
   const fetchSubjects = async () => {
-    const { data } = await supabase.from('subjects').select('*').eq('archived', false)
-    if (data) setSubjects(data)
-  }
-
-  useEffect(() => { fetchSubjects() }, [])
+    const { data, error } = await supabase.from("subjects").select("*").eq("archived", false);
+    if (error) setMessage("Unable to load subjects. Please refresh and try again.");
+    else setSubjects(data || []);
+    setLoading(false);
+  };
+  useEffect(() => { fetchSubjects(); }, []);
 
   const addSubject = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newSubject) return
-    const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('subjects').insert([{ name: newSubject, user_id: user?.id }])
-    setNewSubject('')
-    fetchSubjects()
-  }
-
+    e.preventDefault();
+    const subjectName = newSubject.trim();
+    if (!subjectName) return;
+    setSaving(true); setMessage("");
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from("subjects").insert([{ name: subjectName, user_id: user?.id }]);
+    if (error) setMessage("Could not add subject: " + error.message);
+    else { setNewSubject(""); await fetchSubjects(); }
+    setSaving(false);
+  };
   const deleteSubject = async (id: string) => {
-    // We don't actually delete it from the database, we just archive it to keep records safe
-    await supabase.from('subjects').update({ archived: true }).eq('id', id)
-    fetchSubjects()
-  }
+    if (!confirm("Archive this subject? Existing records will be kept.")) return;
+    const { error } = await supabase.from("subjects").update({ archived: true }).eq("id", id);
+    if (error) setMessage("Could not archive subject: " + error.message);
+    else await fetchSubjects();
+  };
 
-  return (
-    <div className="min-h-screen bg-gray-100">
-      <AppHeader />
-      <div className="max-w-3xl mx-auto mt-8 px-4 pb-8">
-        <Link href="/" className="text-blue-500 text-sm mb-4 block">← Back to Dashboard</Link>
-        <div className="mb-6"><h1 className="text-2xl font-bold tracking-tight text-gray-800">Subjects</h1><p className="mt-1 text-sm text-gray-500">Add and organize the subjects you teach.</p></div>
-        
-        <form onSubmit={addSubject} className="mb-6 flex flex-col gap-2 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:flex-row">
-          <input value={newSubject} onChange={e => setNewSubject(e.target.value)} placeholder="e.g. General Math" className="flex-1 p-2 border rounded text-black" />
-          <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">Add</button>
-        </form>
-
-        <ul className="space-y-2">
-          {subjects.map(sub => (
-            <li key={sub.id} className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-              <span className="font-medium text-gray-800">{sub.name}</span>
-              <button onClick={() => deleteSubject(sub.id)} className="text-red-500 text-sm">Remove</button>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  )
+  return <div className="min-h-screen"><AppHeader /><main className="page-container narrow">
+    <Link href="/" className="page-back">← Back to dashboard</Link>
+    <header className="page-heading"><div><p className="eyebrow">Classroom setup</p><h1 className="page-title">Subjects</h1><p className="page-description">Add and organize the subjects you teach.</p></div><span className="status-pill" style={{ background: "var(--accent-soft)", color: "var(--accent)" }}>{subjects.length} active</span></header>
+    <form onSubmit={addSubject} className="panel panel-pad mb-5 flex flex-col gap-3 sm:flex-row">
+      <div className="min-w-0 flex-1"><label htmlFor="subject-name" className="field-label">New subject</label><input id="subject-name" value={newSubject} onChange={e => setNewSubject(e.target.value)} placeholder="e.g. General Mathematics" className="field" maxLength={80} required /></div>
+      <button type="submit" disabled={saving || !newSubject.trim()} className="btn btn-primary self-end">{saving ? "Adding…" : "Add subject"}</button>
+    </form>
+    {message && <p role="status" className="notice mb-4">{message}</p>}
+    <section className="panel panel-pad"><h2 className="panel-title mb-2">Your subjects</h2>
+      {loading ? <p className="py-6 text-sm" style={{ color: "var(--muted)" }}>Loading subjects…</p> : subjects.length === 0 ? <div className="empty-state"><strong>No subjects yet</strong>Add your first subject above to get started.</div> : subjects.map(sub => <div key={sub.id} className="list-row"><div className="flex min-w-0 items-center gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-sm font-bold" style={{ background: "var(--accent-soft)", color: "var(--accent)" }}>▤</span><span className="truncate text-sm font-semibold">{sub.name}</span></div><button onClick={() => deleteSubject(sub.id)} className="btn btn-danger shrink-0">Archive</button></div>)}
+    </section>
+  </main></div>;
 }
