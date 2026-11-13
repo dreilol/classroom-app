@@ -14,6 +14,8 @@ function GuestViewContent() {
   const [notes, setNotes] = useState<any[]>([])
   const [students, setStudents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  // NEW STATE FOR THE TOGGLE
+  const [expandedSubject, setExpandedSubject] = useState<string | null>(null)
 
   // Fetch available dates, then set the latest one as default
   useEffect(() => {
@@ -128,12 +130,64 @@ function GuestViewContent() {
                     
                     {subAtt.length > 0 && (
                       <div className="mb-6">
-                        <h3 className="field-label mb-2">Attendance</h3>
-                        <div className="flex flex-wrap gap-3">
+                        <div className="flex justify-between items-center mb-2">
+                          <h3 className="field-label">Attendance</h3>
+                          {/* THE NEW TOGGLE BUTTON */}
+                          <button 
+                            onClick={() => setExpandedSubject(expandedSubject === subject.id ? null : subject.id)}
+                            className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline"
+                          >
+                            {expandedSubject === subject.id ? 'Hide Details' : 'View Details'}
+                          </button>
+                        </div>
+
+                        <div className="flex flex-wrap gap-3 mb-3">
                           <div className="status-pill status-present">Present: {present}</div>
                           <div className="status-pill status-absent">Absent: {absent}</div>
                           <div className="status-pill status-late">Late: {late}</div>
                         </div>
+
+                        {/* THE NEW DETAILS DROPDOWN */}
+                        {expandedSubject === subject.id && (
+                          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm animate-in fade-in slide-in-from-top-2 duration-200">
+                            
+                            {absent > 0 && (
+                              <div className="mb-3">
+                                <span className="font-bold text-red-600 block mb-1">Absent:</span>
+                                <ul className="list-disc list-inside text-slate-700 grid grid-cols-1 sm:grid-cols-2 gap-1">
+                                  {subAtt.filter(a => a.status === 'A').map(a => {
+                                    const student = students.find(s => s.id === a.student_id);
+                                    return <li key={a.id}>{student?.name}</li>
+                                  })}
+                                </ul>
+                              </div>
+                            )}
+
+                            {late > 0 && (
+                              <div className="mb-3">
+                                <span className="font-bold text-yellow-600 block mb-1">Late:</span>
+                                <ul className="list-disc list-inside text-slate-700 grid grid-cols-1 sm:grid-cols-2 gap-1">
+                                  {subAtt.filter(a => a.status === 'L').map(a => {
+                                    const student = students.find(s => s.id === a.student_id);
+                                    return <li key={a.id}>{student?.name}</li>
+                                  })}
+                                </ul>
+                              </div>
+                            )}
+
+                            {present > 0 && (
+                              <div>
+                                <span className="font-bold text-green-600 block mb-1">Present:</span>
+                                <ul className="list-disc list-inside text-slate-700 grid grid-cols-1 sm:grid-cols-2 gap-1">
+                                  {subAtt.filter(a => a.status === 'P').map(a => {
+                                    const student = students.find(s => s.id === a.student_id);
+                                    return <li key={a.id}>{student?.name}</li>
+                                  })}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
 
